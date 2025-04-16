@@ -1,0 +1,15 @@
+apiVersion: clickhouse.com/v1alpha1
+kind: KeeperCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: test-keeper-cluster
+spec:
+  replicas: 5
+  storage:
+    accessModes:
+      - ReadWriteOncePod
+    resources:
+      requests:
+        storage: 2Gi
