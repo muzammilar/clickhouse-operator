@@ -3,7 +3,10 @@
 [![Website](https://img.shields.io/website?up_message=AVAILABLE&down_message=DOWN&url=https%3A%2F%2Fclickhouse.com&style=for-the-badge)](https://clickhouse.com)
 [![Apache 2.0 License](https://img.shields.io/badge/license-Apache%202.0-blueviolet?style=for-the-badge)](https://www.apache.org/licenses/LICENSE-2.0)
 
-<img align="left" width="200" style="margin-right: 20px;" src="https://github.com/user-attachments/assets/e3dfd12f-9d66-4f11-aac8-2a7d5bb7a507" alt="The ClickHouse Operator logo.">
+<picture>
+    <source media="(prefers-color-scheme: light)" srcset="https://clickhouse.com/docs/img/clickhouse-operator-logo-black.svg">
+    <img align="left" width="300" style="margin-right: 20px;" src="https://clickhouse.com/docs/img/clickhouse-operator-logo.svg" alt="The ClickHouse Operator logo.">
+</picture>
 
 ### ClickHouse Operator
 
