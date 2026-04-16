@@ -62,7 +62,11 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 					"test-annotation": "test-val",
 				},
 			},
+			Status: v1.ClickHouseClusterStatus{
+				Version: "26.1.1.1",
+			},
 		}
+		listOpts = controllerutil.AppRequirements(cr.Namespace, cr.SpecificName())
 	)
 
 	BeforeAll(func(ctx context.Context) {
@@ -115,14 +119,28 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 		Expect(suite.Client.Get(ctx, cr.NamespacedName(), cr)).To(Succeed())
 	})
 
+	It("should create version probe job and wait for completion", func(ctx context.Context) {
+		_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: cr.NamespacedName()})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(suite.Client.List(ctx, &jobs, listOpts)).To(Succeed())
+		Expect(jobs.Items).To(HaveLen(1))
+		Expect(jobs.Items[0].Labels[controllerutil.LabelRoleKey]).To(Equal(controllerutil.LabelVersionProbe))
+
+		testutil.AssertEvents(recorder.Events, map[string]int{
+			"ClusterNotReady": 1,
+		})
+
+		By("completing the version probe job")
+		testutil.CompleteVersionProbeJob(ctx, suite, cr.Namespace, cr.SpecificName(), "26.1.1.1")
+	})
+
 	It("should successfully create all resources of the new cluster", func(ctx context.Context) {
-		By("reconciling the created resource once")
+		By("reconciling the cluster after version probe completion")
 
 		_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: cr.NamespacedName()})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(suite.Client.Get(ctx, cr.NamespacedName(), cr)).To(Succeed())
-
-		listOpts := controllerutil.AppRequirements(cr.Namespace, cr.SpecificName())
 
 		Expect(suite.Client.List(ctx, &services, listOpts)).To(Succeed())
 		Expect(services.Items).To(HaveLen(1))
@@ -138,14 +156,6 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 
 		Expect(suite.Client.List(ctx, &statefulsets, listOpts)).To(Succeed())
 		Expect(statefulsets.Items).To(HaveLen(4))
-
-		Expect(suite.Client.List(ctx, &jobs, listOpts)).To(Succeed())
-		Expect(jobs.Items).To(HaveLen(1))
-		Expect(jobs.Items[0].Labels[controllerutil.LabelRoleKey]).To(Equal(controllerutil.LabelVersionProbe))
-
-		testutil.AssertEvents(recorder.Events, map[string]int{
-			"ClusterNotReady": 1,
-		})
 	})
 
 	It("should propagate version probe overrides to the job", func(ctx context.Context) {
@@ -199,6 +209,9 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 		Expect(jobs.Items[0].Spec.Template.Spec.Tolerations).To(ContainElement(corev1.Toleration{
 			Key: "workload", Operator: corev1.TolerationOpEqual, Value: "system", Effect: corev1.TaintEffectNoSchedule,
 		}))
+
+		By("completing the new version probe job for subsequent tests")
+		testutil.CompleteVersionProbeJob(ctx, suite, cr.Namespace, cr.SpecificName(), "26.1.1.1")
 
 		cr = updatedCR.DeepCopy()
 	})
@@ -287,9 +300,13 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 	})
 
 	It("should generate all secret values", func() {
-		for key := range secretsToGenerate {
-			Expect(secrets.Items[0].Data).To(HaveKey(key))
-			Expect(secrets.Items[0].Data[key]).To(Not(BeEmpty()))
+		for _, spec := range clusterSecrets {
+			if !spec.enabled(cr) {
+				continue
+			}
+
+			Expect(secrets.Items[0].Data).To(HaveKey(spec.Key))
+			Expect(secrets.Items[0].Data[spec.Key]).To(Not(BeEmpty()))
 		}
 	})
 
@@ -302,9 +319,9 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 		}
 	})
 
-	It("should delete unneeded secrets and generate missing", func(ctx context.Context) {
+	It("should preserve unknown secret keys and generate missing", func(ctx context.Context) {
 		secret := secrets.Items[0]
-		secret.Data["invalid-key"] = []byte("invalid-value")
+		secret.Data["unknown-key"] = []byte("unknown-value")
 		delete(secrets.Items[0].Data, SecretKeyManagementPassword)
 		By("Changing secret data")
 		Expect(suite.Client.Update(ctx, &secret)).To(Succeed())
@@ -321,7 +338,7 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 			Namespace: secret.Namespace,
 		}, &secret)).To(Succeed())
 
-		Expect(secret.Data).NotTo(HaveKey("invalid-key"))
+		Expect(secret.Data).To(HaveKey("unknown-key"))
 		Expect(secret.Data).To(HaveKey(SecretKeyManagementPassword))
 		Expect(secret.Data[SecretKeyManagementPassword]).NotTo(BeEmpty())
 	})
@@ -427,9 +444,17 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 		}
 		Expect(suite.Client.Create(ctx, pvcCR)).To(Succeed())
 
-		By("reconcile to create all resources including STS with VolumeClaimTemplates")
+		By("reconcile to create version probe job")
 
 		_, err := controller.Reconcile(ctx, ctrl.Request{NamespacedName: pvcCR.NamespacedName()})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("completing the version probe job")
+		testutil.CompleteVersionProbeJob(ctx, suite, pvcCR.Namespace, pvcCR.SpecificName(), "26.1.1.1")
+
+		By("reconcile to create all resources including STS with VolumeClaimTemplates")
+
+		_, err = controller.Reconcile(ctx, ctrl.Request{NamespacedName: pvcCR.NamespacedName()})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(suite.Client.Get(ctx, pvcCR.NamespacedName(), pvcCR)).To(Succeed())
 		testutil.AssertEvents(recorder.Events, map[string]int{
@@ -452,6 +477,14 @@ var _ = When("reconciling ClickHouseCluster", Ordered, func() {
 		pvcCR.Spec.DataVolumeClaimSpec.StorageClassName = new("changed")
 		pvcCR.Spec.ContainerTemplate.Image = v1.ContainerImage{Tag: "changed"}
 		Expect(suite.Client.Update(ctx, pvcCR)).To(Succeed())
+
+		By("reconcile to create new version probe job for changed image")
+
+		_, err = controller.Reconcile(ctx, ctrl.Request{NamespacedName: pvcCR.NamespacedName()})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("completing the new version probe job")
+		testutil.CompleteVersionProbeJob(ctx, suite, pvcCR.Namespace, pvcCR.SpecificName(), "26.1.1.1")
 
 		By("reconcile updated CR")
 
