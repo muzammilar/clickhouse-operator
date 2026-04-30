@@ -521,17 +521,15 @@ func (r *clickhouseReconciler) reconcileClusterRevisions(ctx context.Context, lo
 		log.Debug(fmt.Sprintf("observed new CR revision %q", updateRevision))
 	}
 
-	if err := r.GetClient().Get(ctx, types.NamespacedName{
-		Namespace: r.Cluster.Namespace,
-		Name:      r.Cluster.Spec.KeeperClusterRef.Name,
-	}, &r.keeper); err != nil {
+	keeperNamespacedName := r.Cluster.KeeperClusterNamespacedName()
+	if err := r.GetClient().Get(ctx, keeperNamespacedName, &r.keeper); err != nil {
 		if k8serrors.IsNotFound(err) {
-			log.Debug("keeper cluster not found, waiting")
+			log.Debug("keeper cluster not found, waiting", "keeper", keeperNamespacedName.String())
 
 			return chctrl.StepBlocked(chctrl.RequeueOnRefreshTimeout), nil
 		}
 
-		return chctrl.StepResult{}, fmt.Errorf("get keeper cluster: %w", err)
+		return chctrl.StepResult{}, fmt.Errorf("get keeper cluster %q: %w", keeperNamespacedName.String(), err)
 	}
 
 	if cond := meta.FindStatusCondition(r.keeper.Status.Conditions, v1.ConditionTypeReady); cond == nil || cond.Status != metav1.ConditionTrue {

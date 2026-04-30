@@ -1,7 +1,7 @@
 kubectl
 hostname
 CRDs
-namespace
+[Nn]amespaces?
 uncomment
 PVCs
 PDBs

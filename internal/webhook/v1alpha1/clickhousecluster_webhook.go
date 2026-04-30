@@ -89,10 +89,6 @@ func (w *ClickHouseClusterWebhook) validateImpl(obj *chv1.ClickHouseCluster) (ad
 		errs  []error
 	)
 
-	if obj.Spec.KeeperClusterRef == nil || obj.Spec.KeeperClusterRef.Name == "" {
-		errs = append(errs, errors.New("keeperClusterRef name must not be empty"))
-	}
-
 	if err := obj.Spec.Settings.TLS.Validate(); err != nil {
 		errs = append(errs, err)
 	}

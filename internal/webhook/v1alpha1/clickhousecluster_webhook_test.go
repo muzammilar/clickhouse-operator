@@ -24,7 +24,7 @@ var _ = Describe("ClickHouseCluster Webhook", func() {
 					Name:      "test-default",
 				},
 				Spec: chv1.ClickHouseClusterSpec{
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: chv1.KeeperClusterReference{
 						Name: "some-keeper-cluster",
 					},
 				},
@@ -47,7 +47,7 @@ var _ = Describe("ClickHouseCluster Webhook", func() {
 					Name:      "test-default",
 				},
 				Spec: chv1.ClickHouseClusterSpec{
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: chv1.KeeperClusterReference{
 						Name: "some-keeper-cluster",
 					},
 					DataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{Resources: corev1.VolumeResourceRequirements{
@@ -73,7 +73,7 @@ var _ = Describe("ClickHouseCluster Webhook", func() {
 				Name:      "test-validate",
 			},
 			Spec: chv1.ClickHouseClusterSpec{
-				KeeperClusterRef: &corev1.LocalObjectReference{
+				KeeperClusterRef: chv1.KeeperClusterReference{
 					Name: "some-keeper-cluster",
 				},
 			},
@@ -91,6 +91,23 @@ var _ = Describe("ClickHouseCluster Webhook", func() {
 			err := k8sClient.Create(ctx, cluster)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("TLS cannot be required"))
+		})
+
+		It("Should allow explicit keeper namespace", func(ctx context.Context) {
+			cluster := chCluster.DeepCopy()
+			cluster.Spec.KeeperClusterRef.Namespace = "keeper-ns"
+
+			Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+			deferCleanup(cluster)
+		})
+
+		It("Should reject invalid keeper namespace", func(ctx context.Context) {
+			cluster := chCluster.DeepCopy()
+			cluster.Spec.KeeperClusterRef.Namespace = "Keeper_NS"
+
+			err := k8sClient.Create(ctx, cluster)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("keeperClusterRef.namespace"))
 		})
 
 		It("Should check certificate passed if TLS enabled", func(ctx context.Context) {

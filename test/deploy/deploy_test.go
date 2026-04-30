@@ -15,7 +15,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -377,7 +376,7 @@ func testDeployment(namespace string) {
 			},
 			Spec: v1.ClickHouseClusterSpec{
 				Replicas: new(int32(1)),
-				KeeperClusterRef: &corev1.LocalObjectReference{
+				KeeperClusterRef: v1.KeeperClusterReference{
 					Name: keeper.Name,
 				},
 				ContainerTemplate: v1.ContainerTemplateSpec{

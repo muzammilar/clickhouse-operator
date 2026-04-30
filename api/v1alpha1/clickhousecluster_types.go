@@ -32,8 +32,9 @@ type ClickHouseClusterSpec struct {
 	Shards *int32 `json:"shards"`
 
 	// Reference to the KeeperCluster that is used for ClickHouse coordination.
+	// When namespace is omitted, the ClickHouseCluster namespace is used.
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Keeper Cluster Reference"
-	KeeperClusterRef *corev1.LocalObjectReference `json:"keeperClusterRef"`
+	KeeperClusterRef KeeperClusterReference `json:"keeperClusterRef"`
 
 	// Parameters passed to the ClickHouse pod spec.
 	// +optional
@@ -206,6 +207,37 @@ type ClickHouseClusterStatus struct {
 	VersionProbeRevision string `json:"versionProbeRevision,omitempty"`
 }
 
+// KeeperClusterReference identifies the KeeperCluster used by a ClickHouseCluster.
+type KeeperClusterReference struct {
+	// Name of the KeeperCluster resource.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	// +kubebuilder:validation:MaxLength=63
+	Name string `json:"name"`
+	// Namespace of the KeeperCluster resource.
+	// When omitted, the ClickHouseCluster namespace is used.
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=63
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// NamespacedName resolves the reference to a fully-qualified Kubernetes object key.
+func (r *KeeperClusterReference) NamespacedName(defaultNamespace string) types.NamespacedName {
+	if r == nil {
+		return types.NamespacedName{}
+	}
+
+	namespace := r.Namespace
+	if namespace == "" {
+		namespace = defaultNamespace
+	}
+
+	return types.NamespacedName{
+		Namespace: namespace,
+		Name:      r.Name,
+	}
+}
+
 // ClickHouseCluster is the Schema for the `clickhouseclusters` API.
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -372,6 +404,11 @@ func (v *ClickHouseCluster) ConfigMapNameByReplicaID(id ClickHouseReplicaID) str
 // StatefulSetNameByReplicaID returns name of the StatefulSet for the specific replica.
 func (v *ClickHouseCluster) StatefulSetNameByReplicaID(id ClickHouseReplicaID) string {
 	return fmt.Sprintf("%s-%d-%d", v.SpecificName(), id.ShardID, id.Index)
+}
+
+// KeeperClusterNamespacedName returns the fully-qualified KeeperCluster reference.
+func (v *ClickHouseCluster) KeeperClusterNamespacedName() types.NamespacedName {
+	return v.Spec.KeeperClusterRef.NamespacedName(v.Namespace)
 }
 
 // HostnameByID returns domain name for the specific replica to access within Kubernetes cluster.

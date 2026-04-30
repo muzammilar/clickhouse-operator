@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const testDefaultClusterDomain = "cluster.local"
@@ -57,6 +58,47 @@ var _ = Describe("KeeperCluster", func() {
 })
 
 var _ = Describe("ClickHouseCluster", func() {
+	Describe("KeeperClusterNamespacedName", func() {
+		It("should default the keeper namespace to the ClickHouseCluster namespace", func() {
+			cluster := &ClickHouseCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "clickhouse-ns",
+				},
+				Spec: ClickHouseClusterSpec{
+					KeeperClusterRef: KeeperClusterReference{
+						Name: "keeper",
+					},
+				},
+			}
+
+			Expect(cluster.KeeperClusterNamespacedName()).To(Equal(types.NamespacedName{
+				Namespace: "clickhouse-ns",
+				Name:      "keeper",
+			}))
+		})
+
+		It("should use the explicit keeper namespace when provided", func() {
+			cluster := &ClickHouseCluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "clickhouse-ns",
+				},
+				Spec: ClickHouseClusterSpec{
+					KeeperClusterRef: KeeperClusterReference{
+						Name:      "keeper",
+						Namespace: "keeper-ns",
+					},
+				},
+			}
+
+			Expect(cluster.KeeperClusterNamespacedName()).To(Equal(types.NamespacedName{
+				Namespace: "keeper-ns",
+				Name:      "keeper",
+			}))
+		})
+	})
+
 	Describe("HostnameByID", func() {
 		var cluster *ClickHouseCluster
 

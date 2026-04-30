@@ -40,6 +40,17 @@ type ClusterController struct {
 	EnablePDB bool
 }
 
+const keeperClusterReferenceField = "clickhouse.com/keeperClusterReference"
+
+func keeperReferenceFieldValue(cluster *v1.ClickHouseCluster) []string {
+	keeperKey := cluster.KeeperClusterNamespacedName()
+	if keeperKey.Name == "" {
+		return nil
+	}
+
+	return []string{keeperKey.String()}
+}
+
 // +kubebuilder:rbac:groups=clickhouse.com,resources=clickhouseclusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=clickhouse.com,resources=clickhouseclusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=clickhouse.com,resources=clickhouseclusters/finalizers,verbs=update
@@ -156,6 +167,17 @@ func SetupWithManager(mgr ctrl.Manager, log controllerutil.Logger, checker *upgr
 		EnablePDB: enablePDB,
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1.ClickHouseCluster{}, keeperClusterReferenceField, func(obj client.Object) []string {
+		cluster, ok := obj.(*v1.ClickHouseCluster)
+		if !ok {
+			return nil
+		}
+
+		return keeperReferenceFieldValue(cluster)
+	}); err != nil {
+		return fmt.Errorf("index ClickHouseCluster keeper reference: %w", err)
+	}
+
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&v1.ClickHouseCluster{}, builder.WithPredicates(predicate.Or(predicate.GenerationChangedPredicate{}, predicate.LabelChangedPredicate{}, predicate.AnnotationChangedPredicate{}))).
 		Watches(
@@ -191,20 +213,20 @@ func (cc *ClusterController) clickHouseClustersForKeeper(ctx context.Context, ob
 
 	// List all ClickHouseClusters that reference this KeeperCluster
 	var chList v1.ClickHouseClusterList
-	if err := cc.List(ctx, &chList, client.InNamespace(zk.Namespace)); err != nil {
+	if err := cc.List(ctx, &chList, client.MatchingFields{
+		keeperClusterReferenceField: zk.NamespacedName().String(),
+	}); err != nil {
 		return nil
 	}
 
 	var requests []reconcile.Request
 	for _, ch := range chList.Items {
-		if ch.Spec.KeeperClusterRef.Name == zk.Name {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      ch.Name,
-					Namespace: ch.Namespace,
-				},
-			})
-		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      ch.Name,
+				Namespace: ch.Namespace,
+			},
+		})
 	}
 
 	return requests

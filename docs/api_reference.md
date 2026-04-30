@@ -47,7 +47,7 @@ ClickHouseClusterSpec defines the desired state of ClickHouseCluster.
 |-------|------|-------------|----------|---------|
 | `replicas` | integer | Number of replicas in the single shard. | false | 3 |
 | `shards` | integer | Number of shards in the cluster. | false | 1 |
-| `keeperClusterRef` | [LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core) | Reference to the KeeperCluster that is used for ClickHouse coordination. | true |  |
+| `keeperClusterRef` | [KeeperClusterReference](#keeperclusterreference) | Reference to the KeeperCluster that is used for ClickHouse coordination.<br />When namespace is omitted, the ClickHouseCluster namespace is used. | true |  |
 | `podTemplate` | [PodTemplateSpec](#podtemplatespec) | Parameters passed to the ClickHouse pod spec. | false |  |
 | `containerTemplate` | [ContainerTemplateSpec](#containertemplatespec) | Parameters passed to the ClickHouse container spec. | false |  |
 | `dataVolumeClaimSpec` | [PersistentVolumeClaimSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#persistentvolumeclaimspec-v1-core) | Specification of persistent storage for ClickHouse data. | false |  |
@@ -241,6 +241,19 @@ kind: KeeperClusterList
 | Field | Type | Description | Required | Default |
 |-------|------|-------------|----------|---------|
 | `items` | [KeeperCluster](#keepercluster) array |  | true |  |
+
+
+## KeeperClusterReference
+
+KeeperClusterReference identifies the KeeperCluster used by a ClickHouseCluster.
+
+| Field | Type | Description | Required | Default |
+|-------|------|-------------|----------|---------|
+| `name` | string | Name of the KeeperCluster resource. | true |  |
+| `namespace` | string | Namespace of the KeeperCluster resource.<br />When omitted, the ClickHouseCluster namespace is used. | false |  |
+
+Appears in:
+- [ClickHouseClusterSpec](#clickhouseclusterspec)
 
 
 ## KeeperClusterSpec

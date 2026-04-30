@@ -72,7 +72,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 						},
 					},
 					DataVolumeClaimSpec: &defaultStorage,
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeper.Name,
 					},
 				},
@@ -129,7 +129,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 						},
 					},
 					DataVolumeClaimSpec: &defaultStorage,
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeper.Name,
 					},
 				},
@@ -176,7 +176,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 				Spec: v1.ClickHouseClusterSpec{
 					Replicas:            new(int32(1)),
 					DataVolumeClaimSpec: nil, // Diskless configuration
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeper.Name,
 					},
 					PodTemplate: v1.PodTemplateSpec{
@@ -219,7 +219,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 				Spec: v1.ClickHouseClusterSpec{
 					Replicas:            new(int32(1)),
 					DataVolumeClaimSpec: nil, // Diskless configuration
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeper.Name,
 					},
 					ContainerTemplate: v1.ContainerTemplateSpec{
@@ -281,7 +281,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 				},
 				Spec: v1.ClickHouseClusterSpec{
 					Replicas: new(int32(2)),
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeper.Name,
 					},
 					ContainerTemplate: v1.ContainerTemplateSpec{
@@ -388,7 +388,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 				},
 				Spec: v1.ClickHouseClusterSpec{
 					Replicas: new(int32(2)),
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeper.Name,
 					},
 					PodTemplate: v1.PodTemplateSpec{
@@ -495,7 +495,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 				Spec: v1.ClickHouseClusterSpec{
 					Replicas: new(int32(2)),
 					Shards:   new(int32(2)),
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeper.Name,
 					},
 					ContainerTemplate: v1.ContainerTemplateSpec{
@@ -581,7 +581,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 						Image: v1.ContainerImage{Tag: BaseVersion},
 					},
 					DataVolumeClaimSpec: &defaultStorage,
-					KeeperClusterRef:    &corev1.LocalObjectReference{Name: keeper.Name},
+					KeeperClusterRef:    v1.KeeperClusterReference{Name: keeper.Name},
 				},
 			}
 
@@ -646,7 +646,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 					Replicas:            new(int32(1)),
 					ContainerTemplate:   v1.ContainerTemplateSpec{Image: v1.ContainerImage{Tag: BaseVersion}},
 					DataVolumeClaimSpec: &defaultStorage,
-					KeeperClusterRef:    &corev1.LocalObjectReference{Name: keeper.Name},
+					KeeperClusterRef:    v1.KeeperClusterReference{Name: keeper.Name},
 					ExternalSecret: &v1.ExternalSecret{
 						Name:   secretName,
 						Policy: v1.ExternalSecretPolicyObserve,
@@ -781,7 +781,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 				},
 				Spec: v1.ClickHouseClusterSpec{
 					Replicas: new(int32(2)),
-					KeeperClusterRef: &corev1.LocalObjectReference{
+					KeeperClusterRef: v1.KeeperClusterReference{
 						Name: keeperCR.Name,
 					},
 					ContainerTemplate: v1.ContainerTemplateSpec{
@@ -949,7 +949,7 @@ var _ = Describe("ClickHouse controller", Label("clickhouse"), func() {
 			Spec: v1.ClickHouseClusterSpec{
 				Replicas:            new(int32(3)),
 				DataVolumeClaimSpec: &defaultStorage,
-				KeeperClusterRef: &corev1.LocalObjectReference{
+				KeeperClusterRef: v1.KeeperClusterReference{
 					Name: keeperName,
 				},
 				PodTemplate: v1.PodTemplateSpec{

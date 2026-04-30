@@ -68,8 +68,8 @@ spec:
 
 ### ClickHouse Keeper is Required
 
-Every ClickHouseCluster requires a ClickHouse Keeper cluster for distributed coordination. 
-The Keeper cluster must be referenced in the ClickHouseCluster spec using `keeperClusterRef`.
+Every ClickHouseCluster requires a ClickHouse Keeper cluster for distributed coordination.
+The Keeper cluster must be referenced in the ClickHouseCluster spec using `keeperClusterRef`. By default the operator looks in the ClickHouseCluster namespace, but you can also set `keeperClusterRef.namespace` to point at a KeeperCluster in another watched namespace.
 
 ###  One-to-One Keeper Relationship
 
