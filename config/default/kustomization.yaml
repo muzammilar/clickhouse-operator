@@ -74,6 +74,35 @@ replacements:
 #          delimiter: '.'
 #          index: 0
 #          create: true
+#      - select:
+#          kind: ServiceMonitor
+#          group: monitoring.coreos.com
+#          version: v1
+#          name: controller-manager-metrics-monitor
+#        fieldPaths:
+#          - spec.endpoints.0.tlsConfig.serverName
+#        options:
+#          delimiter: '.'
+#          index: 0
+#          create: true
+#
+#  - source:
+#      kind: Service
+#      version: v1
+#      name: metrics-service
+#      fieldPath: metadata.namespace
+#    targets:
+#      - select: # Uncomment the following to set the Service namespace for TLS in Prometheus ServiceMonitor
+#          kind: ServiceMonitor
+#          group: monitoring.coreos.com
+#          version: v1
+#          name: controller-manager-metrics-monitor
+#        fieldPaths:
+#          - spec.endpoints.0.tlsConfig.serverName
+#        options:
+#          delimiter: '.'
+#          index: 1
+#          create: true
 
 # [WEBHOOK] To enable webhook, uncomment this section.
   - source: # Update Certificate DNS names to match the Service name

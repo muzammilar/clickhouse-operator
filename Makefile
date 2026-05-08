@@ -159,7 +159,11 @@ test-clickhouse-e2e: ## Run clickhouse e2e tests.
 
 .PHONY: test-compat-e2e  # Run compatibility smoke tests across ClickHouse versions.
 test-compat-e2e: ## Run compatibility e2e tests (requires CLICKHOUSE_VERSION env var).
-	go test ./test/deploy/ -test.timeout 30m -v --ginkgo.v --ginkgo.junit-report=report/junit-report.xml
+	go test ./test/deploy/ -test.timeout 30m -v --ginkgo.v --ginkgo.label-filter=!olm --ginkgo.junit-report=report/junit-report.xml
+
+.PHONY: test-compat-e2e-olm  # Run OLM deployment smoke test.
+test-compat-e2e-olm: ## Run OLM deployment e2e test on a dedicated cluster.
+	go test ./test/deploy/ -test.timeout 30m -v --ginkgo.v --ginkgo.label-filter=olm --ginkgo.junit-report=report/junit-report.xml
 
 .PHONY: test-compat-e2e-manifest  # Run compatibility smoke tests (manifests deployment only).
 test-compat-e2e-manifest: ## Run compatibility e2e tests using manifests deployment only (requires CLICKHOUSE_VERSION env var).
@@ -186,17 +190,15 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 ##@ Helm Chart
 
 .PHONY: generate-helmchart
-generate-helmchart: kubebuilder ## Generate helm charts
-	$(KUBEBUILDER) edit --plugins=helm/v2-alpha
-	rm .github/workflows/test-chart.yml dist/install.yaml
+generate-helmchart: kubebuilder kustomize ## Generate helm charts
+	$(KUSTOMIZE) build config/helm -o dist/install-helm.yaml
+	$(KUBEBUILDER) edit --plugins=helm/v2-alpha --manifests dist/install-helm.yaml
+	rm .github/workflows/test-chart.yml dist/install-helm.yaml
 
 .PHONY: generate-helmchart-ci
 generate-helmchart-ci: generate-helmchart ## Generate helm charts and reset some files that will always generate diff
 	git checkout dist/chart/templates/cert-manager/
 	git checkout dist/chart/templates/manager/
-	git checkout dist/chart/templates/metrics/
-	git checkout dist/chart/templates/monitoring/
-	git checkout dist/chart/templates/webhook/
 
 .PHONY: build-helmchart-dependencies
 build-helmchart-dependencies: ## Build helm chart dependencies
@@ -331,7 +333,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.20.1
 ENVTEST_VERSION ?= release-0.23
 GOLANGCI_LINT_VERSION ?= v2.11.4
 GINKGO_VERSION ?= v2.28.1
-KUBEBUILDER_VERSION ?= v4.13.1
+KUBEBUILDER_VERSION ?= v4.14.0
 CODESPELL_VERSION ?= 2.4.2
 CRD_SCHEMA_CHECKER_VERSION ?= latest
 CRD_REF_DOCS_VERSION ?= v0.3.0

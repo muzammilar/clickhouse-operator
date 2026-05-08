@@ -1,0 +1,137 @@
+namespace: clickhouse-operator-system
+namePrefix: clickhouse-operator-
+
+resources:
+- ../crd
+- ../rbac
+- ../manager
+- ../prometheus
+
+components:
+  - ../certmanager
+  - ../webhook
+  - ../metrics_secure
+
+replacements:
+  - source:
+      kind: Deployment
+      version: v1
+      name: controller-manager
+      fieldPath: metadata.namespace
+    targets:
+      - select:
+          kind: Certificate
+          name: serving-cert
+        fieldPaths:
+          - .spec.dnsNames.[=NAMESPACE]
+        options:
+          delimiter: '.'
+          index: 1
+          create: true
+
+  - source:
+      kind: Service
+      version: v1
+      name: metrics-service
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Certificate
+          name: serving-cert
+        fieldPaths:
+          - .spec.dnsNames.[=METRICS_SERVICE_NAME]
+        options:
+          delimiter: '.'
+          index: 0
+          create: true
+      - select:
+          kind: ServiceMonitor
+          group: monitoring.coreos.com
+          version: v1
+          name: controller-manager-metrics-monitor
+        fieldPaths:
+          - spec.endpoints.0.tlsConfig.serverName
+        options:
+          delimiter: '.'
+          index: 0
+          create: true
+
+  - source:
+      kind: Service
+      version: v1
+      name: metrics-service
+      fieldPath: metadata.namespace
+    targets:
+      - select:
+          kind: ServiceMonitor
+          group: monitoring.coreos.com
+          version: v1
+          name: controller-manager-metrics-monitor
+        fieldPaths:
+          - spec.endpoints.0.tlsConfig.serverName
+        options:
+          delimiter: '.'
+          index: 1
+          create: true
+
+  - source: # Update Certificate DNS names to match the Service name
+      kind: Service
+      version: v1
+      name: webhook-service
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: Certificate
+          name: serving-cert
+        fieldPaths:
+          - .spec.dnsNames.[=WEBHOOK_SERVICE_NAME]
+        options:
+          delimiter: '.'
+          index: 0
+          create: true
+  - source: # Set certificate reference to cert-manager.io/inject-ca-from annotation
+      kind: Certificate
+      group: cert-manager.io
+      version: v1
+      name: serving-cert # This name should match the one in certificate.yaml
+      fieldPath: .metadata.namespace # Namespace of the certificate CR
+    targets:
+      - select:
+          kind: ValidatingWebhookConfiguration
+        fieldPaths:
+          - .metadata.annotations.[cert-manager.io/inject-ca-from]
+        options:
+          delimiter: '/'
+          index: 0
+          create: true
+      - select:
+          kind: MutatingWebhookConfiguration
+        fieldPaths:
+          - .metadata.annotations.[cert-manager.io/inject-ca-from]
+        options:
+          delimiter: '/'
+          index: 0
+          create: true
+  - source:
+      kind: Certificate
+      group: cert-manager.io
+      version: v1
+      name: serving-cert
+      fieldPath: .metadata.name
+    targets:
+      - select:
+          kind: ValidatingWebhookConfiguration
+        fieldPaths:
+          - .metadata.annotations.[cert-manager.io/inject-ca-from]
+        options:
+          delimiter: '/'
+          index: 1
+          create: true
+      - select:
+          kind: MutatingWebhookConfiguration
+        fieldPaths:
+          - .metadata.annotations.[cert-manager.io/inject-ca-from]
+        options:
+          delimiter: '/'
+          index: 1
+          create: true

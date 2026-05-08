@@ -3,7 +3,7 @@ Expand the name of the chart.
 */}}
 {{- define "clickhouse-operator.name" -}}
 {{- default (trimSuffix "-helm" .Chart.Name) .Values.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}q
+{{- end }}
 
 {{/*
 Create a default fully qualified app name.
@@ -58,5 +58,19 @@ Cribbed from the cert-manager organization.
 {{- with index . 0 -}}
 {{ printf .repository }}
 {{- if .digest -}}{{ printf "@%s" .digest }}{{- else -}}{{ printf ":%s" (default $defaultTag .tag) }}{{- end -}}
+{{- end }}
+{{- end }}
+
+{{/*
+ServiceAccount name to use.
+If serviceAccount.enable is explicitly false and serviceAccount.name is set,
+use that name. Otherwise, use the standard resourceName helper with
+"controller-manager" suffix.
+*/}}
+{{- define "clickhouse-operator.serviceAccountName" -}}
+{{- if and (hasKey .Values.serviceAccount "enable") (not .Values.serviceAccount.enable) .Values.serviceAccount.name }}
+{{- .Values.serviceAccount.name }}
+{{- else }}
+{{- include "clickhouse-operator.resourceName" (dict "suffix" "controller-manager" "context" .) }}
 {{- end }}
 {{- end }}

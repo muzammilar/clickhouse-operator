@@ -1,4 +1,4 @@
-{{- if and .Values.certManager.enable .Values.webhook.enable }}
+{{- if and .Values.certManager.enable .Values.metrics.enable .Values.metrics.secure }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -7,12 +7,12 @@ metadata:
     app.kubernetes.io/name: {{ include "clickhouse-operator.name" . }}
     helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
     app.kubernetes.io/instance: {{ .Release.Name }}
-  name: {{ include "clickhouse-operator.resourceName" (dict "suffix" "serving-cert" "context" $) }}
+  name: {{ include "clickhouse-operator.resourceName" (dict "suffix" "metrics-certs" "context" $) }}
   namespace: {{ .Release.Namespace }}
 spec:
   dnsNames:
-  - {{ include "clickhouse-operator.resourceName" (dict "suffix" "webhook-service" "context" $) }}.{{ .Release.Namespace }}.svc
-  - {{ include "clickhouse-operator.resourceName" (dict "suffix" "webhook-service" "context" $) }}.{{ .Release.Namespace }}.svc.cluster.local
+  - clickhouse-operator-metrics-service.{{ .Release.Namespace }}.svc
+  - clickhouse-operator-metrics-service.{{ .Release.Namespace }}.svc.cluster.local
   issuerRef:
   {{- if .Values.certManager.issuerRef}}
     {{ .Values.certManager.issuerRef | toYaml | nindent 4 }}
@@ -20,5 +20,5 @@ spec:
     kind: Issuer
     name: {{ include "clickhouse-operator.resourceName" (dict "suffix" "selfsigned-issuer" "context" $) }}
   {{- end }}
-  secretName: webhook-server-cert
+  secretName: metrics-server-cert
 {{- end }}
