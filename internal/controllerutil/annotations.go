@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	AnnotationSpecHash    = "checksum/spec"
-	AnnotationConfigHash  = "checksum/configuration"
-	AnnotationRestartedAt = "kubectl.kubernetes.io/restartedAt"
+	AnnotationSpecHash             = "checksum/spec"
+	AnnotationConfigHash           = "checksum/configuration"
+	AnnotationReloadableConfigHash = "checksum/reloadable-configuration"
 
 	AnnotationStatefulSetVersion = "clickhouse.com/statefulset-version"
 )
