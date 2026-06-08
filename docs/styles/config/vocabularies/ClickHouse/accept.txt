@@ -23,7 +23,13 @@ gofmt
 Gomega
 matchers
 configs
+autoscaler
+GitOps
+Gatekeeper
+Kyverno
+NotReady
 reachability
 interserver
 misconfiguration
 requeues
+RBAC
