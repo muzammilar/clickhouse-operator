@@ -38,6 +38,11 @@ const (
 	EventReasonUpgradeAvailable   EventReason = "VersionUpgradeAvailable"
 )
 
+// ClickHouse warning event.
+const (
+	EventReasonClickHouseWarning EventReason = "ClickHouseWarning"
+)
+
 // EventAction represents the action associated with an event.
 type EventAction = string
 

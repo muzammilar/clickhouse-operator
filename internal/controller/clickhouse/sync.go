@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"hash/fnv"
 	"maps"
 	"slices"
 	"strconv"
@@ -130,6 +131,7 @@ func (r *clickhouseReconciler) sync(ctx context.Context, log ctrlutil.Logger) (c
 		{Name: "ClusterSecret", Fn: r.reconcileClusterSecret, Always: true},
 		{Name: "ExternalSecret", Fn: r.reconcileExternalSecret, Always: true},
 		{Name: "ActiveReplicaStatus", Fn: r.reconcileActiveReplicaStatus, Always: true},
+		{Name: "Warnings", Fn: r.reconcileWarnings, Always: true},
 		{Name: "ClusterRevisions", Fn: r.reconcileClusterRevisions, Always: true},
 		{Name: "ReplicaResources", Fn: r.reconcileReplicaResources},
 		{Name: "DatabaseSync", Fn: r.reconcileDatabaseSync},
@@ -510,6 +512,53 @@ func (r *clickhouseReconciler) reconcileActiveReplicaStatus(ctx context.Context,
 	r.evaluateReplicaConditions()
 
 	return chctrl.StepContinue(), nil
+}
+
+func warningAction(id v1.ClickHouseReplicaID, msg string) string {
+	h := fnv.New64a()
+	_, _ = fmt.Fprintf(h, "%d/%d/%s", id.ShardID, id.Index, msg)
+	return fmt.Sprintf("Warning-%d-%d-%016x", id.ShardID, id.Index, h.Sum64())
+}
+
+func (r *clickhouseReconciler) reconcileWarnings(ctx context.Context, log ctrlutil.Logger) (chctrl.StepResult, error) {
+	if r.commander == nil {
+		return chctrl.StepRequeue(chctrl.WarningsPollInterval), nil
+	}
+
+	ids := slices.Collect(maps.Keys(r.ReplicaState))
+
+	results := ctrlutil.ExecuteParallel(ids, func(id v1.ClickHouseReplicaID) (v1.ClickHouseReplicaID, struct{}, error) {
+		replica := r.ReplicaState[id]
+		if replica.Error || replica.STS == nil || replica.STS.Status.ReadyReplicas == 0 {
+			return id, struct{}{}, nil
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, chctrl.LoadReplicaStateTimeout)
+		defer cancel()
+
+		warnings, err := r.commander.Warnings(ctx, id)
+		if err != nil {
+			return id, struct{}{}, fmt.Errorf("fetch warnings from replica %s: %w", id, err)
+		}
+
+		log.Debug("system.warnings fetched", "replica_id", id, "count", len(warnings))
+
+		for _, warning := range warnings {
+			r.GetRecorder().Eventf(r.Cluster, nil, corev1.EventTypeWarning,
+				v1.EventReasonClickHouseWarning, warningAction(id, warning),
+				"Replica %s: %s", r.Cluster.HostnameByID(id), warning)
+		}
+
+		return id, struct{}{}, nil
+	})
+
+	for id, res := range results {
+		if res.Err != nil {
+			log.Warn("failed to publish replica warnings", "replica_id", id, "error", res.Err)
+		}
+	}
+
+	return chctrl.StepRequeue(chctrl.WarningsPollInterval), nil
 }
 
 func (r *clickhouseReconciler) reconcileClusterRevisions(ctx context.Context, log ctrlutil.Logger) (chctrl.StepResult, error) {
