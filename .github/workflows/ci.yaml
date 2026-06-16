@@ -209,9 +209,15 @@ jobs:
             k8s_image: v1.30.13
             clickhouse_version: "26.3,26.2,26.1,25.8"
             deploy_target: test-compat-e2e-manifest
+          - name: operator-upgrade
+            k8s_image: v1.30.13
+            clickhouse_version: "26.3"
+            deploy_target: test-compat-e2e-upgrade
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-tags: 'true'
 
       - name: Free disk space
         uses: jlumbroso/free-disk-space@v1.3.0

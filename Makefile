@@ -166,7 +166,7 @@ test-clickhouse-e2e: ## Run clickhouse e2e tests.
 
 .PHONY: test-compat-e2e  # Run compatibility smoke tests across ClickHouse versions.
 test-compat-e2e: ## Run compatibility e2e tests (requires CLICKHOUSE_VERSION env var).
-	go test ./test/deploy/ -test.timeout 30m -v --ginkgo.v --ginkgo.label-filter='!olm' --ginkgo.junit-report=report/junit-report.xml
+	go test ./test/deploy/ -test.timeout 30m -v --ginkgo.v --ginkgo.label-filter='!olm && !upgrade' --ginkgo.junit-report=report/junit-report.xml
 
 .PHONY: test-compat-e2e-olm  # Run OLM deployment smoke test.
 test-compat-e2e-olm: ## Run OLM deployment e2e test on a dedicated cluster.
@@ -179,6 +179,10 @@ test-compat-e2e-olm-openshift: ## Run OLM deployment e2e against an OpenShift cl
 .PHONY: test-compat-e2e-manifest  # Run compatibility smoke tests (manifests deployment only).
 test-compat-e2e-manifest: ## Run compatibility e2e tests using manifests deployment only (requires CLICKHOUSE_VERSION env var).
 	go test ./test/deploy/ -test.timeout 30m -v --ginkgo.v --ginkgo.label-filter=manifest --ginkgo.junit-report=report/junit-report.xml
+
+.PHONY: test-compat-e2e-upgrade  # Run operator upgrade e2e (latest release -> local build).
+test-compat-e2e-upgrade: ## Run operator upgrade e2e test: deploy on the latest release, then upgrade to the local build.
+	go test ./test/deploy/ -test.timeout 30m -v --ginkgo.v --ginkgo.label-filter=upgrade --ginkgo.junit-report=report/junit-report.xml
 
 .PHONY: lint
 lint: golangci-lint codespell actionlint ## Run golangci-lint linter, codespell, and actionlint
