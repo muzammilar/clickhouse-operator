@@ -66,6 +66,8 @@ type KeeperClusterSpec struct {
 	UpgradeChannel string `json:"upgradeChannel,omitempty"`
 
 	// VersionProbeTemplate overrides for the version detection Job.
+	//
+	// Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility.
 	// +optional
 	VersionProbeTemplate *VersionProbeTemplate `json:"versionProbeTemplate,omitempty"`
 }
@@ -161,12 +163,13 @@ type KeeperClusterStatus struct {
 	// ObservedGeneration indicates latest generation observed by controller.
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-	// Version indicates the version reported by the container image.
+	// Version indicates the version reported by the Keeper server.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	Version string `json:"version,omitempty"`
 	// VersionProbeRevision is the image hash of the last successful version probe.
-	// When this matches the current image hash, the cached Version is used directly.
+	//
+	// Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility.
 	// +optional
 	// +operator-sdk:csv:customresourcedefinitions:type=status
 	VersionProbeRevision string `json:"versionProbeRevision,omitempty"`

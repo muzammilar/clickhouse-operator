@@ -275,7 +275,7 @@ KeeperClusterSpec defines the desired state of KeeperCluster.
 | `settings` | [KeeperSettings](#keepersettings) | Configuration parameters for ClickHouse Keeper server. | false |  |
 | `clusterDomain` | string | ClusterDomain is the Kubernetes cluster domain suffix used for DNS resolution. | false | cluster.local |
 | `upgradeChannel` | string | UpgradeChannel specifies the release channel for major version upgrade checks.<br />When empty, only minor updates will be proposed. Allowed values are: stable, lts or specific major.minor version (e.g. 25.8). | false |  |
-| `versionProbeTemplate` | [VersionProbeTemplate](#versionprobetemplate) | VersionProbeTemplate overrides for the version detection Job. | false |  |
+| `versionProbeTemplate` | [VersionProbeTemplate](#versionprobetemplate) | VersionProbeTemplate overrides for the version detection Job.<br />Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility. | false |  |
 
 Appears in:
 - [KeeperCluster](#keepercluster)
@@ -293,8 +293,8 @@ KeeperClusterStatus defines the observed state of KeeperCluster.
 | `currentRevision` | string | CurrentRevision indicates latest applied KeeperCluster spec revision. | true |  |
 | `updateRevision` | string | UpdateRevision indicates latest requested KeeperCluster spec revision. | true |  |
 | `observedGeneration` | integer | ObservedGeneration indicates latest generation observed by controller. | true |  |
-| `version` | string | Version indicates the version reported by the container image. | false |  |
-| `versionProbeRevision` | string | VersionProbeRevision is the image hash of the last successful version probe.<br />When this matches the current image hash, the cached Version is used directly. | false |  |
+| `version` | string | Version indicates the version reported by the Keeper server. | false |  |
+| `versionProbeRevision` | string | VersionProbeRevision is the image hash of the last successful version probe.<br />Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility. | false |  |
 
 Appears in:
 - [KeeperCluster](#keepercluster)

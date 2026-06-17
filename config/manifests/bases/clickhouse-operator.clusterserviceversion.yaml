@@ -141,12 +141,12 @@ spec:
           revision.
         displayName: Update Revision
         path: updateRevision
-      - description: Version indicates the version reported by the container image.
+      - description: Version indicates the version reported by the Keeper server.
         displayName: Version
         path: version
       - description: |-
           VersionProbeRevision is the image hash of the last successful version probe.
-          When this matches the current image hash, the cached Version is used directly.
+          Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility.
         displayName: Version Probe Revision
         path: versionProbeRevision
       version: v1alpha1

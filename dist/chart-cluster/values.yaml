@@ -162,5 +162,7 @@ keeper:
     # upgradeChannel: ""
 
     # VersionProbeTemplate overrides for the version detection Job.
+    #
+    # Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility.
     # versionProbeTemplate: {}
 

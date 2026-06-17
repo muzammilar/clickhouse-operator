@@ -54,7 +54,8 @@ func baseJob() batchv1.Job {
 						{
 							Name:    v1.VersionProbeContainerName,
 							Image:   "clickhouse/clickhouse-server:latest",
-							Command: []string{"sh", "-c", "clickhouse-server --version"},
+							Command: []string{versionProbeBinary},
+							Args:    []string{"local", "--query", versionProbeQuery},
 							SecurityContext: &corev1.SecurityContext{
 								RunAsNonRoot: new(true),
 							},
@@ -189,7 +190,8 @@ var _ = Describe("patchResource with jobSchema (version probe overrides)", func(
 
 		By("verifying container command is preserved")
 		Expect(container.Image).To(Equal("clickhouse/clickhouse-server:latest"))
-		Expect(container.Command).To(Equal([]string{"sh", "-c", "clickhouse-server --version"}))
+		Expect(container.Command).To(Equal([]string{versionProbeBinary}))
+		Expect(container.Args).To(Equal([]string{"local", "--query", versionProbeQuery}))
 	})
 
 	It("should deep-merge securityContext via SMP", func() {
@@ -311,7 +313,6 @@ func (f *fakeController) GetRecorder() events.EventRecorder { return f.recorder 
 // probeCfg returns a VersionProbeConfig with the given image and cache values.
 func probeCfg(image, cachedVersion, cachedRevision string) VersionProbeConfig {
 	return VersionProbeConfig{
-		Binary: "clickhouse-server",
 		ContainerTemplate: v1.ContainerTemplateSpec{
 			Image: v1.ContainerImage{Repository: image, Tag: "latest"},
 		},
@@ -376,6 +377,12 @@ var _ = Describe("VersionProbe caching", func() {
 		var jobs batchv1.JobList
 		Expect(rm.ctrl.GetClient().List(ctx, &jobs, client.InNamespace("default"))).To(Succeed())
 		Expect(jobs.Items).To(HaveLen(1))
+
+		By("verifying the probe runs the shell-free distroless command")
+
+		container := jobs.Items[0].Spec.Template.Spec.Containers[0]
+		Expect(container.Command).To(Equal([]string{"/usr/bin/clickhouse"}))
+		Expect(container.Args).To(Equal([]string{"local", "--query", "INSERT INTO FUNCTION file('/dev/termination-log', 'RawBLOB', 'version String') SELECT version()"}))
 	})
 
 	It("should miss cache when image changes", func(ctx context.Context) {

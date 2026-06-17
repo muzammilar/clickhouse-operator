@@ -6163,8 +6163,10 @@ spec:
                 pattern: ^(lts|stable|\d+\.\d+)?$
                 type: string
               versionProbeTemplate:
-                description: VersionProbeTemplate overrides for the version detection
-                  Job.
+                description: |-
+                  VersionProbeTemplate overrides for the version detection Job.
+
+                  Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility.
                 properties:
                   metadata:
                     description: Metadata applied to the version probe Job.
@@ -6869,13 +6871,14 @@ spec:
                   spec revision.
                 type: string
               version:
-                description: Version indicates the version reported by the container
-                  image.
+                description: Version indicates the version reported by the Keeper
+                  server.
                 type: string
               versionProbeRevision:
                 description: |-
                   VersionProbeRevision is the image hash of the last successful version probe.
-                  When this matches the current image hash, the cached Version is used directly.
+
+                  Deprecated: Keeper version probe Jobs are not used; this field is retained for backward compatibility.
                 type: string
             type: object
         type: object

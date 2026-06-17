@@ -26,12 +26,12 @@ const (
 	DefaultProbeCPURequest    = "250m"
 	DefaultProbeMemoryLimit   = "256Mi"
 	DefaultProbeMemoryRequest = "256Mi"
+	versionProbeBinary        = "/usr/bin/clickhouse"
+	versionProbeQuery         = "INSERT INTO FUNCTION file('/dev/termination-log', 'RawBLOB', 'version String') SELECT version()"
 )
 
 // VersionProbeConfig holds parameters for the version probe Job.
 type VersionProbeConfig struct {
-	// Name of the binary to run.
-	Binary string
 	// Labels to apply to the Job, inherited from the cluster spec.
 	Labels map[string]string
 	// Annotations to apply to the Job, inherited from the cluster spec.
@@ -148,10 +148,11 @@ func (rm *ResourceManager) VersionProbe(
 	return VersionProbeResult{Version: version, Revision: revision}, nil
 }
 
-// GetVersionSyncCondition evaluates the VersionInSync condition based on the probe result and replica versions.
-// Returns current condition and optional EventSpec that should be recorded if condition Status changed.
+// GetVersionSyncCondition evaluates the VersionInSync condition by comparing the known
+// cluster version against the versions reported by replicas. The version must be known;
+// the "version unavailable" states are reported by the caller.
 func GetVersionSyncCondition(
-	probe VersionProbeResult,
+	version string,
 	replicaVersions map[string]string,
 	isUpdating bool,
 ) (metav1.Condition, []EventSpec) {
@@ -164,25 +165,10 @@ func GetVersionSyncCondition(
 		}
 	}
 
-	if probe.Err != nil {
-		message := fmt.Sprintf("Version probe failed: %v", probe.Err)
-
-		return newCond(metav1.ConditionUnknown, v1.ConditionReasonVersionProbeFailed, message), []EventSpec{{
-			Type:    corev1.EventTypeWarning,
-			Reason:  v1.EventReasonVersionProbeFailed,
-			Action:  v1.EventActionVersionCheck,
-			Message: message,
-		}}
-	}
-
-	if probe.Pending {
-		return newCond(metav1.ConditionUnknown, v1.ConditionReasonVersionPending, "Version probe has not completed yet"), nil
-	}
-
 	var mismatched []string
-	for id, version := range replicaVersions {
-		if version != "" && version != probe.Version {
-			mismatched = append(mismatched, fmt.Sprintf("%s: %s", id, version))
+	for id, replicaVersion := range replicaVersions {
+		if replicaVersion != "" && replicaVersion != version {
+			mismatched = append(mismatched, fmt.Sprintf("%s: %s", id, replicaVersion))
 		}
 	}
 
@@ -192,7 +178,7 @@ func GetVersionSyncCondition(
 
 	slices.Sort(mismatched)
 	cond := newCond(metav1.ConditionFalse, v1.ConditionReasonVersionMismatch,
-		fmt.Sprintf("Replica version doesn't match version probe %s: %s", probe.Version, strings.Join(mismatched, ", ")))
+		fmt.Sprintf("Replica version doesn't match %s: %s", version, strings.Join(mismatched, ", ")))
 
 	if isUpdating {
 		return cond, nil
@@ -280,7 +266,8 @@ func (rm *ResourceManager) buildVersionProbeJob(cfg VersionProbeConfig, revision
 							SecurityContext:          DefaultContainerSecurityContext(),
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 							TerminationMessagePath:   corev1.TerminationMessagePathDefault,
-							Command:                  []string{"sh", "-c", fmt.Sprintf("%s --version > %s 2>&1", cfg.Binary, corev1.TerminationMessagePathDefault)},
+							Command:                  []string{versionProbeBinary},
+							Args:                     []string{"local", "--query", versionProbeQuery},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse(DefaultProbeCPURequest),
