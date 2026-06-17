@@ -1,0 +1,15 @@
+storage_configuration:
+  disks:
+{{- range . }}
+    {{ .Name }}:
+      path: {{ .Path }}
+{{- end }}
+  policies:
+    default:
+      volumes:
+        main:
+          disk:
+            - default
+{{- range . }}
+            - {{ .Name }}
+{{- end }}

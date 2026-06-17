@@ -49,6 +49,14 @@ type ClickHouseClusterSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Data Volume Claim Spec"
 	DataVolumeClaimSpec *corev1.PersistentVolumeClaimSpec `json:"dataVolumeClaimSpec,omitempty"`
 
+	// Additional per-pod PVC templates for JBOD / multi-disk storage.
+	// Each entry is propagated in StatefulSet volumeClaimTemplate, mounted at /var/lib/clickhouse/disks/<name> and
+	// added to the generated JBOD storage policy.
+	// The set of disks is fixed at creation.
+	// +optional
+	// +listType=atomic
+	AdditionalVolumeClaimTemplates []PersistentVolumeClaimTemplate `json:"additionalVolumeClaimTemplates,omitempty"`
+
 	// Additional labels that are added to resources.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
@@ -156,6 +164,12 @@ func (s *ClickHouseClusterSpec) WithDefaults() {
 
 	if s.DataVolumeClaimSpec != nil && len(s.DataVolumeClaimSpec.AccessModes) == 0 {
 		s.DataVolumeClaimSpec.AccessModes = []corev1.PersistentVolumeAccessMode{DefaultAccessMode}
+	}
+
+	for i, t := range s.AdditionalVolumeClaimTemplates {
+		if len(t.Spec.AccessModes) == 0 {
+			s.AdditionalVolumeClaimTemplates[i].Spec.AccessModes = []corev1.PersistentVolumeAccessMode{DefaultAccessMode}
+		}
 	}
 }
 

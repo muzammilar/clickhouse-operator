@@ -33,6 +33,8 @@ var (
 	userConfigTemplateStr string
 	//go:embed templates/client.yaml.tmpl
 	clientConfigTemplateStr string
+	//go:embed templates/storage_jbod.yaml.tmpl
+	storageJBODConfigTemplateStr string
 
 	generators []configGenerator
 )
@@ -114,6 +116,14 @@ func init() {
 		Filename:  ClientConfigFileName,
 		Raw:       clientConfigTemplateStr,
 		Generator: clientConfigGenerator,
+	}, {
+		Path:      path.Join(ConfigPath, ConfigDPath),
+		Filename:  "10-storage-jbod.yaml",
+		Raw:       storageJBODConfigTemplateStr,
+		Generator: storageJBODConfigGenerator,
+		Enabled: func(r *clickhouseReconciler) bool {
+			return len(r.Cluster.Spec.AdditionalVolumeClaimTemplates) > 0
+		},
 	}} {
 		tmpl := template.Must(template.New("").Funcs(templateFuncs).Parse(templateSpec.Raw))
 
@@ -476,6 +486,28 @@ func namedCollectionsConfigGenerator(tmpl *template.Template, _ *clickhouseRecon
 	builder := strings.Builder{}
 	if err := tmpl.Execute(&builder, params); err != nil {
 		return "", fmt.Errorf("template named collections config: %w", err)
+	}
+
+	return builder.String(), nil
+}
+
+type additionalDisk struct {
+	Name string
+	Path string
+}
+
+func storageJBODConfigGenerator(tmpl *template.Template, r *clickhouseReconciler, _ v1.ClickHouseReplicaID) (string, error) {
+	disks := make([]additionalDisk, 0, len(r.Cluster.Spec.AdditionalVolumeClaimTemplates))
+	for _, d := range r.Cluster.Spec.AdditionalVolumeClaimTemplates {
+		disks = append(disks, additionalDisk{
+			Name: strings.ReplaceAll(d.Name, "-", "_"),
+			Path: AdditionalDiskBasePath + d.Name + "/",
+		})
+	}
+
+	builder := strings.Builder{}
+	if err := tmpl.Execute(&builder, disks); err != nil {
+		return "", fmt.Errorf("template JBOD config: %w", err)
 	}
 
 	return builder.String(), nil

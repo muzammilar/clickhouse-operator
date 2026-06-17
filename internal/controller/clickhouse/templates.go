@@ -288,6 +288,17 @@ func templateStatefulSet(r *clickhouseReconciler, id v1.ClickHouseReplicaID, cfg
 		}}
 	}
 
+	for _, addl := range r.Cluster.Spec.AdditionalVolumeClaimTemplates {
+		spec.VolumeClaimTemplates = append(spec.VolumeClaimTemplates, corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        addl.Name,
+				Labels:      controllerutil.MergeMaps(addl.Labels, resourceLabels),
+				Annotations: controllerutil.MergeMaps(addl.Annotations, r.Cluster.Spec.Annotations),
+			},
+			Spec: *addl.Spec.DeepCopy(),
+		})
+	}
+
 	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
@@ -733,6 +744,13 @@ func buildMounts(r *clickhouseReconciler) []corev1.VolumeMount {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      internal.PersistentVolumeName,
 			MountPath: internal.ClickHouseDataPath,
+		})
+	}
+
+	for _, addl := range r.Cluster.Spec.AdditionalVolumeClaimTemplates {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      addl.Name,
+			MountPath: AdditionalDiskBasePath + addl.Name,
 		})
 	}
 

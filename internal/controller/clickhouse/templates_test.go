@@ -64,6 +64,34 @@ var _ = Describe("BuildVolumes", func() {
 		checkVolumeMounts(volumes, mounts)
 	})
 
+	It("should mount additionalVolumeClaimTemplates at their default JBOD path", func() {
+		ctx.Cluster = &v1.ClickHouseCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: v1.ClickHouseClusterSpec{
+				DataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+				AdditionalVolumeClaimTemplates: []v1.PersistentVolumeClaimTemplate{
+					{NamedTemplateMeta: v1.NamedTemplateMeta{Name: "disk1"}, Spec: corev1.PersistentVolumeClaimSpec{}},
+					{NamedTemplateMeta: v1.NamedTemplateMeta{Name: "disk2"}, Spec: corev1.PersistentVolumeClaimSpec{}},
+				},
+			},
+		}
+
+		// Additional disks are backed by StatefulSet volumeClaimTemplates (not pod
+		// volumes), so they appear as mounts only; the volume is provided by the STS.
+		mounts := buildMounts(&ctx)
+		Expect(mounts).To(HaveLen(7)) // 5 from data+config + 2 additional
+
+		mountPaths := make(map[string]string)
+		for _, m := range mounts {
+			mountPaths[m.MountPath] = m.Name
+		}
+
+		Expect(mountPaths["/var/lib/clickhouse/disks/disk1"]).To(Equal("disk1"))
+		Expect(mountPaths["/var/lib/clickhouse/disks/disk2"]).To(Equal("disk2"))
+	})
+
 	It("should add volumes provided by user", func() {
 		ctx.Cluster = &v1.ClickHouseCluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -483,6 +511,73 @@ var _ = Describe("getConfigurationRevisions", func() {
 		Expect(revsAfter.Config).To(Not(Equal(revsBefore.Config)))
 		Expect(revsAfter.Reload).To(Not(Equal(revsBefore.Reload)))
 		Expect(revsAfter.Restart).To(Equal(revsBefore.Restart))
+	})
+})
+
+var _ = Describe("TemplateStatefulSet", func() {
+	It("should mount additional JBOD disks from explicit PVC volumes", func() {
+		r := &clickhouseReconciler{
+			Cluster: &v1.ClickHouseCluster{
+				ObjectMeta: metav1.ObjectMeta{Name: "jbod", Namespace: "default"},
+				Spec: v1.ClickHouseClusterSpec{
+					Shards:           new(int32(2)),
+					Replicas:         new(int32(2)),
+					KeeperClusterRef: v1.KeeperClusterReference{Name: "keeper"},
+					DataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("100Gi")},
+						},
+					},
+					AdditionalVolumeClaimTemplates: []v1.PersistentVolumeClaimTemplate{
+						{
+							NamedTemplateMeta: v1.NamedTemplateMeta{Name: "disk1"},
+							Spec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+								Resources: corev1.VolumeResourceRequirements{
+									Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("100Gi")},
+								},
+							},
+						},
+						{
+							NamedTemplateMeta: v1.NamedTemplateMeta{Name: "disk2"},
+							Spec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+								Resources: corev1.VolumeResourceRequirements{
+									Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("100Gi")},
+								},
+							},
+						},
+					},
+				},
+			},
+			keeper: v1.KeeperCluster{ObjectMeta: metav1.ObjectMeta{Name: "keeper"}},
+		}
+		r.Cluster.Spec.WithDefaults()
+
+		sts, err := templateStatefulSet(r, v1.ClickHouseReplicaID{ShardID: 0, Index: 0}, "fixed-cfg-rev")
+		Expect(err).To(Not(HaveOccurred()))
+
+		// Primary + both additional disks are reconciled identically, as volumeClaimTemplates.
+		vctNames := make([]string, 0, len(sts.Spec.VolumeClaimTemplates))
+		for _, vct := range sts.Spec.VolumeClaimTemplates {
+			vctNames = append(vctNames, vct.Name)
+		}
+
+		Expect(vctNames).To(ConsistOf(internal.PersistentVolumeName, "disk1", "disk2"))
+
+		podSpec, err := templatePodSpec(r, v1.ClickHouseReplicaID{ShardID: 0, Index: 0})
+		Expect(err).To(Not(HaveOccurred()))
+
+		mountPaths := make(map[string]string)
+		for _, c := range podSpec.Containers {
+			for _, m := range c.VolumeMounts {
+				mountPaths[m.MountPath] = m.Name
+			}
+		}
+
+		Expect(mountPaths["/var/lib/clickhouse/disks/disk1"]).To(Equal("disk1"))
+		Expect(mountPaths["/var/lib/clickhouse/disks/disk2"]).To(Equal("disk2"))
 	})
 })
 

@@ -7,6 +7,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	v1 "github.com/ClickHouse/clickhouse-operator/api/v1alpha1"
+
+	"github.com/ClickHouse/clickhouse-operator/internal"
 )
 
 // validateCustomVolumeMounts validates that the provided volume mounts correspond to defined volumes and
@@ -74,6 +78,59 @@ func validateDataVolumeSpecChanges(oldSpec, newSpec *corev1.PersistentVolumeClai
 
 	if oldSpec != nil && newSpec == nil {
 		return errors.New("data volume cannot be removed after cluster creation")
+	}
+
+	return nil
+}
+
+// validateAdditionalVolumeClaimTemplates validates additionalVolumeClaimTemplates not collide with the
+// primary data volume name, and be unique within the slice.
+func validateAdditionalVolumeClaimTemplates(data *corev1.PersistentVolumeClaimSpec, additional []v1.PersistentVolumeClaimTemplate) []error {
+	if len(additional) == 0 {
+		return nil
+	}
+
+	if data == nil {
+		return []error{errors.New("dataVolumeClaimSpec should be set in order to enable additionalVolumeClaimTemplates")}
+	}
+
+	var errs []error
+
+	seenNames := make(map[string]struct{})
+	for i, tmpl := range additional {
+		if tmpl.Name == internal.PersistentVolumeName {
+			errs = append(errs, fmt.Errorf("additionalVolumeClaimTemplates[%d].metadata.name %q collides with primary data volume name", i, tmpl.Name))
+		}
+
+		if tmpl.Name == "default" {
+			errs = append(errs, fmt.Errorf("additionalVolumeClaimTemplates[%d].metadata.name %q is reserved by the ClickHouse default disk", i, tmpl.Name))
+		}
+
+		if _, ok := seenNames[tmpl.Name]; ok {
+			errs = append(errs, fmt.Errorf("additionalVolumeClaimTemplates has duplicate name %q", tmpl.Name))
+		}
+
+		seenNames[tmpl.Name] = struct{}{}
+	}
+
+	return errs
+}
+
+// validateAdditionalVolumeClaimTemplatesChanges ensures that the set of additional disks is fixed.
+func validateAdditionalVolumeClaimTemplatesChanges(oldTemplates, newTemplates []v1.PersistentVolumeClaimTemplate) error {
+	if len(oldTemplates) != len(newTemplates) {
+		return errors.New("additionalVolumeClaimTemplates cannot be added or removed after cluster creation")
+	}
+
+	newNames := make(map[string]struct{}, len(newTemplates))
+	for _, t := range newTemplates {
+		newNames[t.Name] = struct{}{}
+	}
+
+	for _, t := range oldTemplates {
+		if _, ok := newNames[t.Name]; !ok {
+			return fmt.Errorf("additionalVolumeClaimTemplates names cannot be changed after cluster creation, missing %q", t.Name)
+		}
 	}
 
 	return nil

@@ -211,77 +211,12 @@ func (rm *ResourceManager) Delete(ctx context.Context, resource client.Object, a
 	return nil
 }
 
-// GetPVCByStatefulSet returns the PersistentVolumeClaim created by given StatefulSet.
-func (rm *ResourceManager) GetPVCByStatefulSet(
-	ctx context.Context,
-	log util.Logger,
-	sts *appsv1.StatefulSet,
-) (*corev1.PersistentVolumeClaim, error) {
-	if len(sts.Spec.VolumeClaimTemplates) == 0 {
-		return nil, fmt.Errorf("StatefulSet %s does not have volume claim templates", sts.Name)
-	}
-
-	var pvc corev1.PersistentVolumeClaim
-	if err := rm.ctrl.GetClient().Get(ctx, types.NamespacedName{
-		Namespace: sts.Namespace,
-		Name:      fmt.Sprintf("%s-%s-0", sts.Spec.VolumeClaimTemplates[0].Name, sts.Name),
-	}, &pvc); err != nil {
-		if k8serrors.IsNotFound(err) {
-			log.Info("PVC not found for StatefulSet", "statefulset", sts.Name)
-			return nil, nil
-		}
-
-		return nil, fmt.Errorf("get PVC for StatefulSet %s: %w", sts.Name, err)
-	}
-
-	return &pvc, nil
-}
-
 // ReplicaUpdateInput contains the parameters needed to reconcile a StatefulSet for a replica.
 type ReplicaUpdateInput struct {
 	Revisions RevisionState
 	Existing  ReplicaState
 	Desired   ReplicaState
 	HasError  bool
-}
-
-// UpdatePVC updates the PersistentVolumeClaim for the given replica ID if it exists and differs from the provided spec.
-func (rm *ResourceManager) UpdatePVC(ctx context.Context, log util.Logger, input ReplicaUpdateInput) error {
-	if input.Desired.PVC == nil {
-		return nil
-	}
-
-	if input.Existing.PVC == nil {
-		log.Debug("replica PVC not found, skipping update")
-		return nil
-	}
-
-	log = log.With("pvc", input.Existing.PVC.Name)
-
-	if util.GetSpecHashFromObject(input.Existing.PVC) == input.Revisions.PVCRevision {
-		log.Debug("PVC is up to date")
-		return nil
-	}
-
-	targetSpec := input.Desired.PVC.Spec.DeepCopy()
-	if err := util.ApplyDefault(targetSpec, input.Existing.PVC.Spec); err != nil {
-		return fmt.Errorf("patch PVC spec: %w", err)
-	}
-
-	log.Info("updating PVC", "diff", gcmp.Diff(input.Existing.PVC.Spec, *targetSpec))
-
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: *input.Existing.PVC.ObjectMeta.DeepCopy(),
-		Spec:       *targetSpec,
-	}
-
-	util.AddSpecHashToObject(pvc, input.Revisions.PVCRevision)
-
-	if err := rm.Update(ctx, pvc, v1.EventActionReconciling); err != nil {
-		return fmt.Errorf("update PVC: %w", err)
-	}
-
-	return nil
 }
 
 // ReconcileReplicaResources reconciles a replica's ConfigMap, StatefulSet and PVC.
@@ -301,8 +236,10 @@ func (rm *ResourceManager) ReconcileReplicaResources(
 
 	// PVC update failures are non-fatal: the next reconciliation will detect the mismatch
 	// via HasDiff and retry. This avoids blocking the STS update on transient PVC conflicts.
-	if err = rm.UpdatePVC(ctx, log, input); err != nil {
-		log.Warn("failed to update replica PVC", "error", err)
+	for name, revision := range input.Revisions.PVCRevisions {
+		if err := rm.updatePVC(ctx, log, input.Existing.PVCs[name], input.Desired.PVCs[name], revision); err != nil {
+			log.Warn("failed to update replica PVC", "pvc", name, "error", err)
+		}
 	}
 
 	statefulSet := input.Desired.STS
@@ -315,8 +252,12 @@ func (rm *ResourceManager) ReconcileReplicaResources(
 		log.Info("replica StatefulSet not found, creating", "statefulset", statefulSet.Name)
 		util.AddSpecHashToObject(statefulSet, input.Revisions.StatefulSetRevision)
 
-		if input.Desired.PVC != nil {
-			util.AddSpecHashToObject(&statefulSet.Spec.VolumeClaimTemplates[0], input.Revisions.PVCRevision)
+		for i := range statefulSet.Spec.VolumeClaimTemplates {
+			vct := &statefulSet.Spec.VolumeClaimTemplates[i]
+			if revision, ok := input.Revisions.PVCRevisions[vct.Name]; ok {
+				vct.Labels = util.MergeMaps(vct.Labels, util.DiskLabel(vct.Name))
+				util.AddSpecHashToObject(vct, revision)
+			}
 		}
 
 		if err := rm.Create(ctx, statefulSet, v1.EventActionReconciling); err != nil {

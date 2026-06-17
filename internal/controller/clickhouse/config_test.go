@@ -4,6 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -18,8 +19,13 @@ var _ = Describe("ConfigGenerator", func() {
 				Namespace: "test-namespace",
 			},
 			Spec: v1.ClickHouseClusterSpec{
-				Replicas: new(int32(3)),
-				Shards:   new(int32(2)),
+				Replicas:            new(int32(3)),
+				Shards:              new(int32(2)),
+				DataVolumeClaimSpec: &corev1.PersistentVolumeClaimSpec{},
+				AdditionalVolumeClaimTemplates: []v1.PersistentVolumeClaimTemplate{
+					{NamedTemplateMeta: v1.NamedTemplateMeta{Name: "test1"}},
+					{NamedTemplateMeta: v1.NamedTemplateMeta{Name: "test2"}},
+				},
 				Settings: v1.ClickHouseSettings{
 					ExtraConfig: runtime.RawExtension{
 						Raw: []byte(`{"test": "value"}`),

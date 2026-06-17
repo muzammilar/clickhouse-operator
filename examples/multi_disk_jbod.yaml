@@ -1,0 +1,37 @@
+apiVersion: clickhouse.com/v1alpha1
+kind: KeeperCluster
+metadata:
+  name: keeper-jbod
+spec:
+  replicas: 3
+  dataVolumeClaimSpec:
+    resources:
+      requests:
+        storage: 1Gi
+---
+apiVersion: clickhouse.com/v1alpha1
+kind: ClickHouseCluster
+metadata:
+  name: clickhouse-jbod
+spec:
+  shards: 2
+  replicas: 2
+  keeperClusterRef:
+    name: keeper-jbod
+  dataVolumeClaimSpec:
+    resources:
+      requests:
+        storage: 10Gi
+  additionalVolumeClaimTemplates:
+    - metadata:
+        name: data-disk1
+      spec:
+        resources:
+          requests:
+            storage: 10Gi
+    - metadata:
+        name: data-disk2
+      spec:
+        resources:
+          requests:
+            storage: 10Gi
